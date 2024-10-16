@@ -1,10 +1,16 @@
-import { useAccount } from "@/2_main";
-import { useNavigate, useParams } from "react-router";
+import {useAccount, useCoState} from "@/2_main";
+import {useNavigate, useParams} from "react-router";
+import {Button} from "@/components/ui/button.tsx";
+import {Pencil} from 'lucide-react';
+import {Playlist} from "@/1_schema.ts";
+import {ID} from "jazz-tools";
+import {useState} from "react";
+import {updatePlaylistTitle} from "@/4_actions.ts";
 
 export function SidePanel() {
-    const { playlistId } = useParams();
+    const {playlistId} = useParams();
     const navigate = useNavigate();
-    const { me } = useAccount({
+    const {me} = useAccount({
         root: {
             playlists: [{}],
         },
@@ -18,11 +24,19 @@ export function SidePanel() {
     }
 
     function handlePlaylistClick(
-        evt: React.MouseEvent<HTMLAnchorElement>,
         playlistId: string,
     ) {
-        evt.preventDefault();
         navigate(`/playlist/${playlistId}`);
+    }
+
+
+    function onRenameClick(playlistId: string, name: string) {
+        const playlist = me?.root.playlists.find((p) => p.id === playlistId);
+
+        if (!playlist) return;
+
+        updatePlaylistTitle(playlist, name)
+
     }
 
     return (
@@ -69,24 +83,70 @@ export function SidePanel() {
                         </a>
                     </li>
                     {me?.root.playlists.map((playlist, index) => (
-                        <li key={index}>
-                            <a
-                                href="#"
-                                className={`block px-2 py-1 text-sm rounded ${
-                                    playlist.id === playlistId
-                                        ? "bg-blue-100 text-blue-600"
-                                        : "hover:bg-blue-100"
-                                }`}
-                                onClick={(evt) =>
-                                    handlePlaylistClick(evt, playlist.id)
-                                }
-                            >
-                                {playlist.title}
-                            </a>
+                        <li key={index} className={`relative`}>
+                            <PlayListItem playlistId={playlist.id} onClick={handlePlaylistClick}
+                                          onRenameClick={onRenameClick} isSelected={playlist.id === playlistId}/>
                         </li>
                     ))}
                 </ul>
             </nav>
         </aside>
     );
+}
+
+function PlayListItem(props: {
+    playlistId: ID<Playlist>,
+    onClick: (playlistId: string) => void,
+    onRenameClick: (playlistId: string, name: string) => void,
+    isSelected: boolean
+}) {
+
+    const playlist = useCoState(Playlist, props.playlistId);
+
+    const [isEditing, setIsEditing] = useState(false);
+
+    if (!playlist) return null;
+
+    return <>
+        {
+            !isEditing && <a
+                href="#"
+                className={`block px-2 py-1 text-sm rounded ${
+                    props.isSelected
+                        ? "bg-blue-100 text-blue-600"
+                        : "hover:bg-blue-100"
+                }`}
+                onClick={(evt) => {
+                    evt.preventDefault()
+                    props.onClick(props.playlistId);
+                }}
+            >
+                {playlist.title}
+            </a>
+        }
+        {
+            isEditing && <form onSubmit={(evt) => {
+                evt.preventDefault()
+                setIsEditing(false)
+            }}>
+                <input
+                    type={`text`}
+                    autoFocus={true}
+                    value={playlist.title}
+                    onChange={(evt) => {
+                        if (!playlist) return;
+
+                        updatePlaylistTitle(playlist, evt.target.value)
+                    }}
+                    onBlur={() => setIsEditing(false)}
+                    className="text-blue-800 bg-transparent"/>
+            </form>
+        }
+        <button className={`border absolute right-0 top-0`} onClick={(evt) => {
+            evt.preventDefault()
+            setIsEditing(!isEditing)
+        }}>
+            <Pencil/>
+        </button>
+    </>
 }
